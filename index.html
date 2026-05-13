@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ARBITER Routing Layer</title>
+  <meta name="description" content="A coherence protocol for supply chain action." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#030405;
+      --panel:#070808;
+      --panel2:#0b0c0d;
+      --surface:#101112;
+      --text:#f7f7f2;
+      --muted:rgba(247,247,242,.58);
+      --faint:rgba(247,247,242,.34);
+      --line:rgba(247,247,242,.12);
+      --line2:rgba(247,247,242,.20);
+      --accent:#75ff8f;
+      --accent2:#b7ff2b;
+      --danger:#ff5a62;
+      --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+    body{overflow:hidden}
+    button,input,textarea{font:inherit}
+    button{cursor:pointer}
+    a{color:inherit;text-decoration:none}
+
+    .workspace{height:100vh;display:grid;grid-template-columns:380px minmax(0,1fr) 340px;grid-template-rows:60px minmax(0,1fr) 38px;grid-template-areas:"header header header" "nav main telemetry" "status status status";background:var(--bg)}
+
+    .header{grid-area:header;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid var(--line);background:#000;z-index:5}
+    .brand{display:flex;align-items:center;gap:12px;min-width:0}
+    .brand-mark{font-family:var(--mono);font-size:20px;color:var(--text)}
+    .brand-title{font-size:16px;font-weight:700;letter-spacing:-.045em}
+    .brand-sub{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);border-left:1px solid var(--line);padding-left:12px;white-space:nowrap}
+    .specs{display:flex;height:100%;border-left:1px solid var(--line)}
+    .spec{display:flex;align-items:center;gap:8px;padding:0 16px;border-right:1px solid var(--line);font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+    .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px rgba(117,255,143,.7);animation:pulse 1.8s ease-in-out infinite}@keyframes pulse{50%{opacity:.35}}
+
+    .nav{grid-area:nav;display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--line);background:var(--panel)}
+    .nav-search{padding:18px;border-bottom:1px solid var(--line)}
+    .nav-search input{width:100%;height:40px;background:#000;border:1px solid var(--line2);outline:0;color:var(--text);padding:0 12px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+    .nav-scroll{overflow:auto;min-height:0;padding-bottom:14px}
+    .nav-group-label{padding:22px 24px 10px;font-family:var(--mono);font-size:10px;color:var(--faint);letter-spacing:.1em;text-transform:uppercase}
+    .nav-item{display:grid;grid-template-columns:56px minmax(0,1fr);gap:14px;padding:14px 24px;border-left:3px solid transparent;min-height:68px;align-items:start;cursor:pointer;color:var(--muted)}
+    .nav-item:hover,.nav-item.active{background:rgba(255,255,255,.035);border-left-color:var(--accent);color:var(--text)}
+    .nav-code{font-family:var(--mono);font-size:10px;line-height:1.15;letter-spacing:.07em;color:var(--accent);white-space:nowrap;overflow:hidden}
+    .nav-label{font-size:14px;line-height:1.18;font-weight:500;letter-spacing:-.03em;white-space:normal}
+    .nav-sub{margin-top:5px;font-family:var(--mono);font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint)}
+
+    .main{grid-area:main;min-height:0;overflow:auto;background:var(--bg)}
+    .hero{position:relative;min-height:430px;padding:56px 64px 42px;overflow:hidden;border-bottom:1px solid var(--line);background:#000}
+    .hero::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 70% 40%,rgba(117,255,143,.12),transparent 36%),linear-gradient(90deg,rgba(0,0,0,.94),rgba(0,0,0,.80) 42%,rgba(0,0,0,.34) 77%,rgba(0,0,0,.16)),repeating-linear-gradient(0deg,rgba(255,255,255,.045) 0 1px,transparent 1px 18px),repeating-linear-gradient(90deg,rgba(255,255,255,.035) 0 1px,transparent 1px 18px);pointer-events:none}
+    .hero::after{content:"PORT ==== RAIL ==== COLD_CHAIN\A   ||         ||        ||\A CUSTOMS == WAREHOUSE == CARRIER\A   ||         ||        ||\A SUPPLIER == ROUTE == CONTROL_TOWER\A\A  [ DEMAND ] -> [ CAPABILITY ] -> [ ACTION ]\A\A  ETA 04:32  TEMP 2-8C  DOCK A17  HOLD:NO\A  ROUTE 0.842  GAP 0.099  MODE LIVE";white-space:pre;position:absolute;right:44px;top:50px;width:min(560px,48%);font-family:var(--mono);font-size:13px;line-height:1.55;color:rgba(117,255,143,.34);letter-spacing:.02em;pointer-events:none;transform:perspective(900px) rotateY(-8deg);transform-origin:right center}
+    .hero>*{position:relative;z-index:1}.hero-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.48);margin-bottom:34px}.hero-title{margin:0 0 22px;max-width:720px;font-size:clamp(42px,5.2vw,78px);line-height:.96;letter-spacing:-.065em;font-weight:560;color:#fff}.hero-desc{max-width:690px;margin:0 0 34px;color:rgba(255,255,255,.68);font-size:19px;line-height:1.44;letter-spacing:-.02em}
+    .command{max-width:920px;border:1px solid var(--line2);background:rgba(0,0,0,.62);backdrop-filter:blur(8px)}
+    .command-box{display:grid;grid-template-columns:42px minmax(0,1fr) 168px;min-height:84px}.command-prompt{display:flex;align-items:flex-start;justify-content:center;padding-top:20px;font-family:var(--mono);font-size:22px;color:var(--accent)}.command-input{min-height:84px;resize:vertical;border:0;outline:0;background:transparent;color:var(--text);padding:18px 14px;font-family:var(--mono);font-size:12px;line-height:1.55}.command-actions{display:grid;grid-template-rows:1fr 1fr;border-left:1px solid var(--line)}.command-btn{border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--muted);font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase}.command-btn:last-child{border-bottom:0}.command-btn.primary{color:var(--accent)}.command-btn:hover{background:rgba(255,255,255,.05);color:var(--text)}.route-pill{display:none;padding:12px 16px;border-top:1px solid var(--line);font-family:var(--mono);font-size:12px;color:var(--accent)}.route-pill.active{display:block}
+
+    .section-header{height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+    .constellation{border-bottom:1px solid var(--line)}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:1px;background:var(--line);padding:1px}.node{position:relative;min-height:112px;background:var(--panel2);padding:14px;display:flex;flex-direction:column;justify-content:space-between}.node.winner{background:#f4f4ef;color:#000}.node.winner::before{content:"selected route";position:absolute;top:10px;right:10px;font-family:var(--mono);font-size:8px;letter-spacing:.12em;text-transform:uppercase;border:1px solid #000;padding:3px 5px;background:rgba(117,255,143,.45);color:#000}.node.winner::after{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--accent)}.node-code{font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:.08em}.node-name{font-size:14px;font-weight:500;line-height:1.18;letter-spacing:-.025em}.node-score{font-family:var(--mono);font-size:16px;color:var(--text)}.node-badge{font-family:var(--mono);font-size:9px;color:var(--faint);letter-spacing:.08em;text-transform:uppercase}.node-track{height:3px;background:rgba(255,255,255,.08);margin-top:10px}.node-fill{height:100%;width:0;background:var(--accent)}.node.winner .node-code,.node.winner .node-name,.node.winner .node-score,.node.winner .node-badge{color:#000}.node.winner .node-track{background:rgba(0,0,0,.18)}.node.winner .node-fill{background:#000}
+
+    .candidates{padding-bottom:24px}.candidate-scroll{padding:16px 28px}.candidate{display:grid;grid-template-columns:38px 1fr 82px;gap:14px;padding:12px 0;border-bottom:1px solid var(--line);align-items:start}.candidate-rank{font-family:var(--mono);font-size:11px;color:var(--faint)}.candidate-title{font-size:14px;font-weight:500;letter-spacing:-.02em}.candidate-text{margin-top:4px;font-family:var(--mono);font-size:10px;line-height:1.4;color:var(--faint);max-width:720px}.candidate-score{text-align:right;font-family:var(--mono);font-size:12px;color:var(--accent)}
+
+    .telemetry{grid-area:telemetry;min-height:0;border-left:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column}.telemetry-header{height:52px;display:flex;align-items:center;padding:0 18px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}.telemetry-body{overflow:auto;min-height:0;padding:16px}.metric{padding:12px 0;border-bottom:1px solid var(--line)}.metric-label{font-family:var(--mono);font-size:10px;color:var(--faint);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}.metric-value{font-family:var(--mono);font-size:18px;color:var(--text)}.metric-bar{height:3px;background:rgba(255,255,255,.08);margin-top:8px}.metric-fill{height:100%;background:var(--accent);width:0}.result-panel{margin-top:18px}.result-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}.result-title{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase}.btn-copy{border:1px solid var(--line);background:#000;color:var(--muted);height:26px;padding:0 8px;font-family:var(--mono);font-size:10px}.code-block{margin:0;padding:12px;border:1px solid var(--line);background:#000;color:var(--muted);font-family:var(--mono);font-size:9px;line-height:1.5;white-space:pre-wrap;word-break:break-word;max-height:240px;overflow:auto}
+
+    .status{grid-area:status;display:flex;align-items:center;justify-content:space-between;padding:0 20px;border-top:1px solid var(--line);background:#000;font-family:var(--mono);font-size:10px;color:var(--faint)}.status-left{display:flex;gap:18px}.status-kv strong{color:var(--muted);font-weight:500}
+
+    @media(max-width:1120px){body{overflow:auto}.workspace{height:auto;min-height:100vh;grid-template-columns:320px minmax(0,1fr);grid-template-areas:"header header" "nav main" "telemetry telemetry" "status status"}.telemetry{border-left:0;border-top:1px solid var(--line);max-height:520px}.hero::after{opacity:.35;width:44%;font-size:11px}.specs .spec:nth-child(n+3){display:none}}
+    @media(max-width:760px){.workspace{display:block}.header{height:auto;min-height:60px}.brand-sub,.specs{display:none}.nav{max-height:420px;border-right:0;border-bottom:1px solid var(--line)}.main{overflow:visible}.hero{padding:42px 22px 30px;min-height:560px}.hero::after{right:20px;top:240px;width:calc(100% - 40px);font-size:10px;opacity:.28}.hero-title{font-size:clamp(40px,12vw,56px)}.hero-desc{font-size:16px}.command-box{grid-template-columns:34px 1fr}.command-actions{grid-column:1/-1;grid-template-columns:1fr 1fr;grid-template-rows:auto;border-left:0;border-top:1px solid var(--line)}.command-btn{height:44px;border-bottom:0;border-right:1px solid var(--line)}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.candidate-scroll{padding:12px 18px}.candidate{grid-template-columns:28px 1fr 70px}.status{display:block;height:auto;padding:14px 18px;line-height:1.8}}
+  </style>
+</head>
+<body>
+  <section class="workspace" id="workspace">
+    <header class="header">
+      <div class="brand"><span class="brand-mark">✧</span><span class="brand-title">ARBITER</span><span class="brand-sub">Supply Chain Router</span></div>
+      <div class="specs"><div class="spec"><span class="dot"></span> Live</div><div class="spec">26 MB</div><div class="spec">CPU-only</div></div>
+    </header>
+    <nav class="nav"><div class="nav-search"><input id="nav-search" placeholder="Search routes..."></div><div class="nav-scroll" id="nav-content"></div></nav>
+    <main class="main">
+      <section class="hero">
+        <div class="hero-eyebrow">ARBITER ROUTING LAYER</div>
+        <h1 class="hero-title">A coherence protocol for supply chain action.</h1>
+        <p class="hero-desc">Submit the current operating state. Arbiter scores available route, recovery, allocation, customs, and cold-chain actions by semantic fit.</p>
+        <div class="command"><div class="command-box"><span class="command-prompt">›</span><textarea id="custom-input" class="command-input" placeholder="Describe the shipment, disruption, inventory constraint, or delivery promise..."></textarea><div class="command-actions"><button class="command-btn" onclick="app.clearInput()">Clear</button><button class="command-btn primary" id="route-btn" onclick="app.routeIntent()">Route ⌘↵</button></div></div><div class="route-pill" id="route-pill"></div></div>
+      </section>
+      <section class="constellation"><div class="section-header"><span>Operational Route Grid</span><span id="grid-meta">76 candidates</span></div><div class="grid" id="constellation-grid"></div></section>
+      <section class="candidates"><div class="section-header"><span>Ranked Operational Actions</span><span id="list-meta">Select a workload</span></div><div class="candidate-scroll" id="candidate-list"></div></section>
+    </main>
+    <aside class="telemetry"><div class="telemetry-header">Routing Trace</div><div class="telemetry-body"><div class="metric"><div class="metric-label">Engine Latency</div><div class="metric-value">&lt;1ms</div></div><div class="metric"><div class="metric-label">API Latency</div><div class="metric-value" id="latest-latency">—</div></div><div class="metric"><div class="metric-label">Score Gap</div><div class="metric-value" id="score-gap">—</div><div class="metric-bar"><div class="metric-fill" id="gap-fill"></div></div></div><div class="metric"><div class="metric-label">Decision Layer</div><div class="metric-value" style="color:var(--accent)">Live</div></div><div class="result-panel"><div class="result-header"><span class="result-title">Endpoint</span><button class="btn-copy" onclick="app.copyCurl()">Copy</button></div><pre class="code-block" id="curl-block"></pre><div class="result-header" style="margin-top:12px"><span class="result-title">Response</span><button class="btn-copy" onclick="app.copyResult()">Copy</button></div><pre class="code-block" id="result-body"></pre></div></div></aside>
+    <footer class="status"><div class="status-left"><div class="status-kv"><strong>Engine:</strong> &lt;1ms</div><div class="status-kv"><strong>API:</strong> <span id="footer-api">—</span></div></div><div>Architecture: 26MB · CPU-only · 76 candidates</div></footer>
+  </section>
+  <script>
+    const API='https://api.arbiter.traut.ai/public/compare';
+    const DESTINATIONS=[
+      {id:0,code:'AIR',name:'Air Freight',category:'Freight Mode',candidate:'air freight air cargo urgent expedited high margin shipment time definite airport uplift limited capacity fast delivery premium cost lightweight electronics parts perishables long distance emergency transit'},
+      {id:1,code:'EXP',name:'Expedited Truck',category:'Freight Mode',candidate:'expedited truck hotshot team drivers urgent freight time critical shipment premium ground direct delivery tight deadline production recovery line down emergency parts delivery'},
+      {id:2,code:'FTL',name:'Full Truckload',category:'Freight Mode',candidate:'full truckload FTL dedicated trailer large shipment direct route dock to dock palletized bulk freight lower handling carrier tender single shipper high volume'},
+      {id:3,code:'LTL',name:'LTL Freight',category:'Freight Mode',candidate:'less than truckload LTL palletized freight regional shipment commercial dock terminal network consolidation moderate urgency cost sensitive partial truckload BOL carrier pickup'},
+      {id:4,code:'RAIL',name:'Intermodal Rail',category:'Freight Mode',candidate:'intermodal rail container long haul cost efficient lower carbon predictable bulk freight port inland ramp drayage non urgent heavy shipment'},
+      {id:5,code:'OCEAN',name:'Ocean Freight',category:'Freight Mode',candidate:'ocean freight container vessel booking international import export port to port long lead time low cost high volume customs documentation maritime shipping'},
+      {id:6,code:'PARCEL',name:'Parcel Network',category:'Freight Mode',candidate:'parcel carrier UPS FedEx DHL small package label sortation residential commercial delivery tracking proof of delivery zone based rating ecommerce fulfillment'},
+      {id:7,code:'COURIER',name:'Same-Day Courier',category:'Freight Mode',candidate:'same day courier local delivery urban route final mile rush order proof of delivery small package tight delivery window white glove hand carry'},
+      {id:8,code:'REEF',name:'Cold Chain Reefer',category:'Cold Chain',candidate:'refrigerated reefer truck cold chain temperature controlled biologics frozen chilled pharma food spoilage risk validated custody temperature excursion monitoring'},
+      {id:9,code:'PHARMA',name:'Validated Pharma Lane',category:'Cold Chain',candidate:'validated pharma lane GDP compliant temperature controlled qualified shipper biologics chain of custody lane validation excursion monitoring quality release'},
+      {id:10,code:'DRYICE',name:'Dry Ice Air Service',category:'Cold Chain',candidate:'dry ice shipment frozen biologics air cargo UN1845 packaging temperature excursion time definite high risk regulated pharma emergency clinical supply'},
+      {id:11,code:'HOLD',name:'Validated Hold',category:'Cold Chain',candidate:'validated storage hold shipment cold room quarantine quality assurance preserve product integrity delay release compliance inspection controlled warehouse custody'},
+      {id:12,code:'CUST',name:'Customs Broker',category:'Port & Customs',candidate:'customs brokerage import clearance tariff HTS code duties documentation commercial invoice customs bond regulatory border compliance release exception'},
+      {id:13,code:'PORT',name:'Port Drayage',category:'Port & Customs',candidate:'port drayage container pickup transload chassis demurrage detention terminal gate appointment inland warehouse port congestion container availability'},
+      {id:14,code:'TRANSLOAD',name:'Transload Facility',category:'Port & Customs',candidate:'transload container unloading palletizing warehouse transfer ocean container to domestic trailer port congestion cross dock inland distribution'},
+      {id:15,code:'BONDED',name:'Bonded Warehouse',category:'Port & Customs',candidate:'bonded warehouse customs controlled storage duty deferred import hold inspection documentation release foreign trade zone regulated goods'},
+      {id:16,code:'DEMURR',name:'Demurrage Mitigation',category:'Port & Customs',candidate:'demurrage detention mitigation terminal fees free time container dwell chassis shortage appointment constraint port delay cost avoidance'},
+      {id:17,code:'FTZ',name:'Foreign Trade Zone',category:'Port & Customs',candidate:'foreign trade zone FTZ duty deferral inverted tariff value added processing customs compliant import export inventory control'},
+      {id:18,code:'DC',name:'Inventory Reallocation',category:'Inventory & DC',candidate:'distribution center inventory reallocation rebalance stock transfer allocate from alternate DC safety stock service level backorder mitigation demand surge'},
+      {id:19,code:'ALLOC',name:'Allocation Override',category:'Inventory & DC',candidate:'allocation override constrained supply prioritize strategic customer margin service level shortage fair share demand segmentation exception approval'},
+      {id:20,code:'REPLEN',name:'Replenishment Order',category:'Inventory & DC',candidate:'inventory replenishment reorder point demand forecast stockout prevention safety stock purchase order transfer order store shelf availability'},
+      {id:21,code:'SLOT',name:'Warehouse Slotting',category:'Inventory & DC',candidate:'warehouse slotting putaway velocity storage zone pick efficiency pallet position labor travel distance cube utilization WMS optimization'},
+      {id:22,code:'PICK',name:'Pick Wave',category:'Inventory & DC',candidate:'pick wave batch picking order release warehouse labor priority cutoff time carrier pickup ecommerce fulfillment WMS wave planning'},
+      {id:23,code:'XDOCK',name:'Cross-Dock',category:'Inventory & DC',candidate:'cross dock transfer consolidation deconsolidation warehouse bypass fast transload no storage flow through distribution hub pallet sorting'},
+      {id:24,code:'BACKORD',name:'Backorder Triage',category:'Inventory & DC',candidate:'backorder triage customer priority shortage substitution split shipment expedite allocate inventory promise date service recovery'},
+      {id:25,code:'ATP',name:'Available-to-Promise',category:'Inventory & DC',candidate:'available to promise ATP order promise inventory availability capacity constraint fulfillment date customer commitment allocation logic'},
+      {id:26,code:'SUPP',name:'Supplier Expedite',category:'Supplier Risk',candidate:'supplier expedite purchase order late component vendor escalation premium freight shortage risk production continuity promised ship date'},
+      {id:27,code:'PO',name:'Purchase Order Exception',category:'Supplier Risk',candidate:'purchase order exception supplier delay price variance quantity discrepancy ASN mismatch invoice hold procurement escalation'},
+      {id:28,code:'DUAL',name:'Dual-Source Switch',category:'Supplier Risk',candidate:'dual source supplier switch alternate vendor qualification shortage resilience sourcing risk mitigation lead time continuity'},
+      {id:29,code:'QUAL',name:'Supplier Quality Hold',category:'Supplier Risk',candidate:'supplier quality hold nonconforming material quarantine inspection defect lot rejection corrective action SCAR production risk'},
+      {id:30,code:'CAP',name:'Supplier Capacity Check',category:'Supplier Risk',candidate:'supplier capacity constraint production allocation line capacity bottleneck promise risk monthly output demand surge'},
+      {id:31,code:'SCORE',name:'Supplier Scorecard',category:'Supplier Risk',candidate:'supplier scorecard on time delivery quality defect rate responsiveness cost risk performance procurement category management'},
+      {id:32,code:'LINE',name:'Line-Down Recovery',category:'Production Continuity',candidate:'manufacturing production line down critical part shortage downtime risk expedite recovery premium freight plant continuity maintenance repair'},
+      {id:33,code:'MRO',name:'MRO Parts Dispatch',category:'Production Continuity',candidate:'MRO maintenance repair operations spare parts dispatch critical equipment repair plant downtime technician component emergency sourcing'},
+      {id:34,code:'SCHED',name:'Production Reschedule',category:'Production Continuity',candidate:'production schedule reschedule line sequencing changeover capacity constraint material availability customer priority plant planning'},
+      {id:35,code:'KIT',name:'Kitting Exception',category:'Production Continuity',candidate:'kitting exception missing component work order assembly kit shortage substitute part production release material readiness'},
+      {id:36,code:'SUBST',name:'Substitution Review',category:'Production Continuity',candidate:'material substitution engineering approval equivalent component quality compliance cost lead time risk product specification'},
+      {id:37,code:'BUFF',name:'Buffer Stock Decision',category:'Production Continuity',candidate:'buffer stock safety inventory critical component volatility demand uncertainty lead time variability service level resilience'},
+      {id:38,code:'NET',name:'Network Design',category:'Planning',candidate:'distribution network design facility location lane optimization inventory positioning service level transportation cost resilience footprint'},
+      {id:39,code:'SOP',name:'S&OP Escalation',category:'Planning',candidate:'sales and operations planning S&OP demand supply imbalance forecast consensus executive escalation capacity constraint inventory target'},
+      {id:40,code:'IBP',name:'Integrated Business Plan',category:'Planning',candidate:'integrated business planning IBP financial plan demand plan supply plan scenario margin service working capital alignment'},
+      {id:41,code:'DEMAND',name:'Demand Signal Review',category:'Planning',candidate:'demand signal review forecast error point of sale sell through customer orders market signal promotion uplift demand sensing'},
+      {id:42,code:'CAPPLAN',name:'Capacity Scenario',category:'Planning',candidate:'capacity planning scenario labor equipment throughput plant constraint overtime subcontract expansion bottleneck demand surge'},
+      {id:43,code:'CARBON',name:'Carbon-Aware Routing',category:'Planning',candidate:'carbon aware routing emissions reduction lower carbon transport rail intermodal sustainability scope 3 fuel efficiency ESG tradeoff'},
+      {id:44,code:'WEATHER',name:'Weather Disruption',category:'Risk & Disruption',candidate:'weather disruption hurricane snow storm flood road closure port closure flight cancellation reroute safety delay exception'},
+      {id:45,code:'STRIKE',name:'Labor Strike Reroute',category:'Risk & Disruption',candidate:'labor strike port strike rail strike warehouse labor disruption contingency route alternative carrier service interruption'},
+      {id:46,code:'GEO',name:'Geopolitical Route Risk',category:'Risk & Disruption',candidate:'geopolitical risk sanctions conflict canal closure piracy border restriction trade compliance route avoidance international shipping'},
+      {id:47,code:'INS',name:'Insurance Escalation',category:'Risk & Disruption',candidate:'cargo insurance claim loss damage theft delay coverage subrogation high value shipment exception documentation adjuster escalation'},
+      {id:48,code:'THEFT',name:'Cargo Theft Risk',category:'Risk & Disruption',candidate:'cargo theft risk high value electronics secure parking team drivers GPS tracking seal control security escort route risk'},
+      {id:49,code:'TEMP',name:'Temperature Excursion',category:'Risk & Disruption',candidate:'temperature excursion cold chain alarm reefer failure data logger deviation quality release hold biologics pharma spoilage risk'},
+      {id:50,code:'RECALL',name:'Recall Logistics',category:'Reverse & Service',candidate:'recall logistics product recall field action returns collection quarantine replacement customer notification traceability regulatory reporting'},
+      {id:51,code:'RET',name:'Returns Processing',category:'Reverse & Service',candidate:'reverse logistics return processing RMA refurbishment recycling inspection restock disposition warranty repair reverse supply chain'},
+      {id:52,code:'WARRANTY',name:'Warranty Replacement',category:'Reverse & Service',candidate:'warranty replacement customer service part dispatch return authorization field failure replacement unit service recovery'},
+      {id:53,code:'REPAIR',name:'Depot Repair Flow',category:'Reverse & Service',candidate:'depot repair flow returned asset diagnosis repair queue spare parts technician capacity turnaround time refurbishment'},
+      {id:54,code:'DISP',name:'Disposition Decision',category:'Reverse & Service',candidate:'disposition decision scrap refurbish restock recycle donate return value recovery quality inspection reverse logistics'},
+      {id:55,code:'REWORK',name:'Rework Routing',category:'Reverse & Service',candidate:'rework routing quality defect production correction repack labeling repair station labor instruction hold release'},
+      {id:56,code:'TENDER',name:'Carrier Tender',category:'Carrier Operations',candidate:'carrier tender spot rate contract carrier capacity acceptance rejection load board freight broker routing guide tender waterfall'},
+      {id:57,code:'RGUIDE',name:'Routing Guide Fallback',category:'Carrier Operations',candidate:'routing guide fallback primary carrier reject secondary carrier tertiary carrier tender waterfall contract compliance procurement'},
+      {id:58,code:'SPOT',name:'Spot Market Buy',category:'Carrier Operations',candidate:'spot market freight buy urgent capacity rate negotiation broker load board premium price volatile market coverage'},
+      {id:59,code:'APPT',name:'Dock Appointment',category:'Carrier Operations',candidate:'dock appointment scheduling warehouse door capacity carrier arrival loading unloading detention wait time yard constraint'},
+      {id:60,code:'YARD',name:'Yard Move',category:'Carrier Operations',candidate:'yard management trailer move jockey driver dock door staging spotter drop hook dwell yard congestion'},
+      {id:61,code:'OTIF',name:'OTIF Recovery',category:'Carrier Operations',candidate:'on time in full OTIF recovery late shipment service level penalty customer compliance retail chargeback delivery appointment'},
+      {id:62,code:'MILK',name:'Milk Run',category:'Carrier Operations',candidate:'milk run multi stop pickup consolidation supplier route recurring schedule lean logistics plant replenishment trailer utilization'},
+      {id:63,code:'POOL',name:'Pool Distribution',category:'Carrier Operations',candidate:'pool distribution regional consolidation retail delivery final mile pooled freight cross dock store replenishment'},
+      {id:64,code:'VIS',name:'Shipment Visibility',category:'Control Tower',candidate:'shipment visibility control tower tracking ETA milestone exception predictive delay telemetry carrier API real time status'},
+      {id:65,code:'ETA',name:'Predictive ETA',category:'Control Tower',candidate:'predictive ETA estimated arrival delay risk traffic weather dwell time machine learning customer notification exception'},
+      {id:66,code:'EXC',name:'Exception Management',category:'Control Tower',candidate:'exception management shipment delay missing milestone carrier non response control tower escalation corrective action'},
+      {id:67,code:'CUSNOT',name:'Customer Notification',category:'Control Tower',candidate:'customer notification delivery delay revised ETA service recovery proactive communication account manager shipment status'},
+      {id:68,code:'TRACE',name:'Trace Investigation',category:'Control Tower',candidate:'trace investigation missing shipment lost freight proof of delivery scan gap carrier terminal search exception'},
+      {id:69,code:'ROOT',name:'Root Cause Review',category:'Control Tower',candidate:'root cause review recurring delay lane failure carrier performance warehouse process corrective action continuous improvement'},
+      {id:70,code:'RATE',name:'Freight Audit',category:'Finance & Cost',candidate:'freight audit invoice rate mismatch accessorial charge detention demurrage fuel surcharge contract compliance payment approval'},
+      {id:71,code:'COST',name:'Cost-to-Serve Review',category:'Finance & Cost',candidate:'cost to serve review customer profitability lane cost freight spend service level margin tradeoff allocation'},
+      {id:72,code:'BUDGET',name:'Freight Budget Variance',category:'Finance & Cost',candidate:'freight budget variance transportation spend overrun premium freight root cause forecast accrual finance review'},
+      {id:73,code:'DUTY',name:'Landed Cost Decision',category:'Finance & Cost',candidate:'landed cost duties tariffs freight insurance inventory carrying cost total cost route mode sourcing decision'},
+      {id:74,code:'CHGBK',name:'Retail Chargeback',category:'Finance & Cost',candidate:'retail chargeback compliance delivery window OTIF ASN labeling routing guide penalty dispute documentation'},
+      {id:75,code:'INV',name:'Inventory Carrying Cost',category:'Finance & Cost',candidate:'inventory carrying cost working capital days inventory safety stock service level obsolescence storage cost finance'}
+    ];
+    const GROUPS=[
+      ['Disruption Response',[44,45,46,66]],['Freight Mode Selection',[1,0,4,5]],['Cold Chain / Regulated',[8,9,49,10]],['Port / Customs',[13,12,14,16]],['Inventory / Warehouse',[18,20,21,22]],['Supplier / Production',[26,28,32,34]],['Control Tower',[64,65,61,67]],['Cost / Finance',[70,71,72,73]],['Reverse / Service',[50,51,53,54]]
+    ];
+    class App{
+      constructor(){this.input=document.getElementById('custom-input');this.byText=new Map(DESTINATIONS.map(d=>[this.norm(d.candidate),d]));this.renderNav();this.renderGrid();this.input.value='A biologics shipment logged a temperature excursion in transit; decide whether to hold, release, or escalate quality review.';this.updateCurl();setTimeout(()=>this.routeIntent(),200);this.input.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter')this.routeIntent()});document.getElementById('nav-search').addEventListener('input',e=>this.filterNav(e.target.value))}
+      norm(s){return String(s||'').toLowerCase().replace(/\s+/g,' ').trim()}
+      renderNav(){const root=document.getElementById('nav-content');root.innerHTML='';GROUPS.forEach(([label,ids])=>{let h=document.createElement('div');h.className='nav-group-label';h.textContent=label;root.appendChild(h);ids.forEach(id=>{let d=DESTINATIONS[id];let el=document.createElement('div');el.className='nav-item';el.dataset.search=`${d.code} ${d.name} ${d.category}`.toLowerCase();el.innerHTML=`<div class="nav-code">${d.code}</div><div><div class="nav-label">${d.name}</div><div class="nav-sub">${d.category}</div></div>`;el.onclick=()=>{document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));el.classList.add('active');this.input.value=d.candidate;this.routeIntent()};root.appendChild(el)})})}
+      filterNav(q){q=q.toLowerCase();document.querySelectorAll('.nav-item').forEach(el=>el.style.display=el.dataset.search.includes(q)?'grid':'none')}
+      renderGrid(rows=[]){const root=document.getElementById('constellation-grid');root.innerHTML='';const scores=new Map(rows.map(r=>[r.destinationId,r.score]));const order=rows.length?[...rows.map(r=>r.destinationId),...DESTINATIONS.map(d=>d.id).filter(id=>!scores.has(id))]:DESTINATIONS.map(d=>d.id);order.forEach((id,i)=>{let d=DESTINATIONS.find(x=>x.id===id);let score=scores.get(id);let node=document.createElement('div');node.className='node'+(i===0&&rows.length?' winner':'');node.innerHTML=`<div><div class="node-code">${d.code}</div><div class="node-name">${d.name}</div></div><div><div class="node-score">${score!=null?score.toFixed(4):'—'}</div><div class="node-badge">${i===0&&rows.length?'Selected route':d.category}</div><div class="node-track"><div class="node-fill" style="width:${score?Math.max(4,score*100):0}%"></div></div></div>`;root.appendChild(node)})}
+      updateCurl(){const payload={query:this.input.value.trim(),candidates:DESTINATIONS.map(d=>d.candidate),use_freq:true,top_k:12};document.getElementById('curl-block').textContent=`curl -X POST ${API} \\\n  -H "Content-Type: application/json" \\\n  --data '${JSON.stringify(payload,null,2)}'`}
+      fallback(q){let words=this.norm(q).split(/\W+/).filter(Boolean);return DESTINATIONS.map(d=>{let text=this.norm(`${d.name} ${d.category} ${d.candidate}`);let score=.12;words.forEach(w=>{if(text.includes(w))score+=.045});if(/temperature|cold|biologic|reefer|pharma|excursion/.test(q.toLowerCase())&&['Cold Chain','Risk & Disruption'].includes(d.category))score+=.24;if(/port|customs|demurrage|transload|container/.test(q.toLowerCase())&&d.category==='Port & Customs')score+=.24;if(/line|urgent|fast|tomorrow|air/.test(q.toLowerCase())&&d.category==='Freight Mode')score+=.18;if(/stock|inventory|dc|warehouse/.test(q.toLowerCase())&&d.category==='Inventory & DC')score+=.18;return{destinationId:d.id,text:d.candidate,score:Math.min(.94,score+Math.random()*.035)}}).sort((a,b)=>b.score-a.score)}
+      async routeIntent(){const q=this.input.value.trim();if(!q)return;this.updateCurl();let btn=document.getElementById('route-btn');btn.textContent='Routing...';let start=performance.now();try{let res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q,candidates:DESTINATIONS.map(d=>d.candidate),use_freq:true,top_k:12})});let json=await res.json();let rows=(json.all||json.top||[]).map((r,i)=>{let text=String(r.text||r.candidate||'');let dest=this.byText.get(this.norm(text))||DESTINATIONS[i];return{destinationId:dest.id,text,score:Number(r.score||0)}}).filter(r=>Number.isFinite(r.score)).sort((a,b)=>b.score-a.score);this.paint(rows,Math.round(performance.now()-start),json)}catch(e){let rows=this.fallback(q);this.paint(rows,Math.round(performance.now()-start),{fallback:true,top:rows.slice(0,12).map(r=>({text:r.text,score:r.score}))})}finally{btn.textContent='Route ⌘↵'}}
+      paint(rows,latency,json){let top=rows[0],second=rows[1],dest=DESTINATIONS.find(d=>d.id===top.destinationId),gap=top.score-(second?.score||0);document.getElementById('latest-latency').textContent=latency+'ms';document.getElementById('footer-api').textContent=latency+'ms';document.getElementById('score-gap').textContent=gap.toFixed(4);document.getElementById('gap-fill').style.width=Math.min(100,gap*300)+'%';let pill=document.getElementById('route-pill');pill.className='route-pill active';pill.textContent=`${dest.name} / ${top.score.toFixed(4)} / gap ${gap.toFixed(4)}`;this.renderGrid(rows);document.getElementById('list-meta').textContent=`${rows.length} candidates scored`;let list=document.getElementById('candidate-list');list.innerHTML='';rows.slice(0,20).forEach((r,i)=>{let d=DESTINATIONS.find(x=>x.id===r.destinationId);let el=document.createElement('div');el.className='candidate';el.innerHTML=`<div class="candidate-rank">${i+1}</div><div><div class="candidate-title">${d.code} · ${d.name}</div><div class="candidate-text">${d.candidate.slice(0,90)}</div></div><div class="candidate-score">${r.score.toFixed(4)}</div>`;list.appendChild(el)});document.getElementById('result-body').textContent=JSON.stringify({route:dest.name,code:dest.code,category:dest.category,score:+top.score.toFixed(6),gap:+gap.toFixed(6),latency_ms:latency,top_5:rows.slice(0,5).map(r=>{let d=DESTINATIONS.find(x=>x.id===r.destinationId);return{route:d.name,code:d.code,score:+r.score.toFixed(6)}})},null,2)}
+      clearInput(){this.input.value='';this.updateCurl()}copyCurl(){navigator.clipboard?.writeText(document.getElementById('curl-block').textContent)}copyResult(){navigator.clipboard?.writeText(document.getElementById('result-body').textContent)}
+    }
+    window.app=new App();
+  </script>
+</body>
+</html>
