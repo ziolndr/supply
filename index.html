@@ -185,8 +185,55 @@
       filterNav(q){q=q.toLowerCase();document.querySelectorAll('.nav-item').forEach(el=>el.style.display=el.dataset.search.includes(q)?'grid':'none')}
       renderGrid(rows=[]){const root=document.getElementById('constellation-grid');root.innerHTML='';const scores=new Map(rows.map(r=>[r.destinationId,r.score]));const order=rows.length?[...rows.map(r=>r.destinationId),...DESTINATIONS.map(d=>d.id).filter(id=>!scores.has(id))]:DESTINATIONS.map(d=>d.id);order.forEach((id,i)=>{let d=DESTINATIONS.find(x=>x.id===id);let score=scores.get(id);let node=document.createElement('div');node.className='node'+(i===0&&rows.length?' winner':'');node.innerHTML=`<div><div class="node-code">${d.code}</div><div class="node-name">${d.name}</div></div><div><div class="node-score">${score!=null?score.toFixed(4):'—'}</div><div class="node-badge">${i===0&&rows.length?'Selected route':d.category}</div><div class="node-track"><div class="node-fill" style="width:${score?Math.max(4,score*100):0}%"></div></div></div>`;root.appendChild(node)})}
       updateCurl(){const payload={query:this.input.value.trim(),candidates:DESTINATIONS.map(d=>d.candidate),use_freq:true,top_k:12};document.getElementById('curl-block').textContent=`curl -X POST ${API} \\\n  -H "Content-Type: application/json" \\\n  --data '${JSON.stringify(payload,null,2)}'`}
-      fallback(q){let words=this.norm(q).split(/\W+/).filter(Boolean);return DESTINATIONS.map(d=>{let text=this.norm(`${d.name} ${d.category} ${d.candidate}`);let score=.12;words.forEach(w=>{if(text.includes(w))score+=.045});if(/temperature|cold|biologic|reefer|pharma|excursion/.test(q.toLowerCase())&&['Cold Chain','Risk & Disruption'].includes(d.category))score+=.24;if(/port|customs|demurrage|transload|container/.test(q.toLowerCase())&&d.category==='Port & Customs')score+=.24;if(/line|urgent|fast|tomorrow|air/.test(q.toLowerCase())&&d.category==='Freight Mode')score+=.18;if(/stock|inventory|dc|warehouse/.test(q.toLowerCase())&&d.category==='Inventory & DC')score+=.18;return{destinationId:d.id,text:d.candidate,score:Math.min(.94,score+Math.random()*.035)}}).sort((a,b)=>b.score-a.score)}
-      async routeIntent(){const q=this.input.value.trim();if(!q)return;this.updateCurl();let btn=document.getElementById('route-btn');btn.textContent='Routing...';let start=performance.now();try{let res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q,candidates:DESTINATIONS.map(d=>d.candidate),use_freq:true,top_k:12})});let json=await res.json();let rows=(json.all||json.top||[]).map((r,i)=>{let text=String(r.text||r.candidate||'');let dest=this.byText.get(this.norm(text))||DESTINATIONS[i];return{destinationId:dest.id,text,score:Number(r.score||0)}}).filter(r=>Number.isFinite(r.score)).sort((a,b)=>b.score-a.score);this.paint(rows,Math.round(performance.now()-start),json)}catch(e){let rows=this.fallback(q);this.paint(rows,Math.round(performance.now()-start),{fallback:true,top:rows.slice(0,12).map(r=>({text:r.text,score:r.score}))})}finally{btn.textContent='Route ⌘↵'}}
+      async routeIntent(){
+        const q=this.input.value.trim();
+        if(!q)return;
+        this.updateCurl();
+        const btn=document.getElementById('route-btn');
+        btn.textContent='Routing...';
+        btn.disabled=true;
+        const start=performance.now();
+        try{
+          const res=await fetch(API,{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({
+              query:q,
+              candidates:DESTINATIONS.map(d=>d.candidate),
+              use_freq:true,
+              top_k:12
+            })
+          });
+          if(!res.ok) throw new Error(`API ${res.status}`);
+          const json=await res.json();
+          const apiRows=json.all||json.results||json.top||[];
+          const rows=apiRows.map((r,i)=>{
+            const text=String(r.text||r.candidate||r.label||'');
+            const dest=this.byText.get(this.norm(text));
+            if(!dest)return null;
+            const score=Number(r.score??r.similarity??r.coherence);
+            if(!Number.isFinite(score))return null;
+            return{destinationId:dest.id,text,score};
+          }).filter(Boolean).sort((a,b)=>b.score-a.score);
+          if(!rows.length)throw new Error('No scored candidates returned');
+          this.paint(rows,Math.round(performance.now()-start),json);
+        }catch(e){
+          this.showError(e,Math.round(performance.now()-start));
+        }finally{
+          btn.disabled=false;
+          btn.textContent='Route ⌘↵';
+        }
+      }
+      showError(error,latency){
+        document.getElementById('latest-latency').textContent=latency+'ms';
+        document.getElementById('footer-api').textContent=latency+'ms';
+        document.getElementById('score-gap').textContent='—';
+        document.getElementById('gap-fill').style.width='0%';
+        document.getElementById('result-body').textContent=JSON.stringify({error:String(error.message||error)},null,2);
+        const pill=document.getElementById('route-pill');
+        pill.className='route-pill active';
+        pill.textContent='Routing error — endpoint did not return scored candidates';
+      }
       paint(rows,latency,json){let top=rows[0],second=rows[1],dest=DESTINATIONS.find(d=>d.id===top.destinationId),gap=top.score-(second?.score||0);document.getElementById('latest-latency').textContent=latency+'ms';document.getElementById('footer-api').textContent=latency+'ms';document.getElementById('score-gap').textContent=gap.toFixed(4);document.getElementById('gap-fill').style.width=Math.min(100,gap*300)+'%';let pill=document.getElementById('route-pill');pill.className='route-pill active';pill.textContent=`${dest.name} / ${top.score.toFixed(4)} / gap ${gap.toFixed(4)}`;this.renderGrid(rows);document.getElementById('list-meta').textContent=`${rows.length} candidates scored`;let list=document.getElementById('candidate-list');list.innerHTML='';rows.slice(0,20).forEach((r,i)=>{let d=DESTINATIONS.find(x=>x.id===r.destinationId);let el=document.createElement('div');el.className='candidate';el.innerHTML=`<div class="candidate-rank">${i+1}</div><div><div class="candidate-title">${d.code} · ${d.name}</div><div class="candidate-text">${d.candidate.slice(0,90)}</div></div><div class="candidate-score">${r.score.toFixed(4)}</div>`;list.appendChild(el)});document.getElementById('result-body').textContent=JSON.stringify({route:dest.name,code:dest.code,category:dest.category,score:+top.score.toFixed(6),gap:+gap.toFixed(6),latency_ms:latency,top_5:rows.slice(0,5).map(r=>{let d=DESTINATIONS.find(x=>x.id===r.destinationId);return{route:d.name,code:d.code,score:+r.score.toFixed(6)}})},null,2)}
       clearInput(){this.input.value='';this.updateCurl()}copyCurl(){navigator.clipboard?.writeText(document.getElementById('curl-block').textContent)}copyResult(){navigator.clipboard?.writeText(document.getElementById('result-body').textContent)}
     }
